@@ -17,12 +17,9 @@ In the function <__init__>, you need to define four lists:
 Now you can use the model class by specifying flag '--model dummy'.
 See our template model class 'template_model.py' for more details.
 """
-
-import os
 import importlib
 from models.base_model import BaseModel
 import torch
-from torch.nn.parallel import DataParallel
 
 
 def find_model_using_name(model_name):
@@ -35,14 +32,16 @@ def find_model_using_name(model_name):
     model_filename = "models." + model_name + "_model"
     modellib = importlib.import_module(model_filename)
     model = None
-    target_model_name = model_name.replace('_', '') + 'model'
+    target_model_name = model_name.replace("_", "") + "model"
     for name, cls in modellib.__dict__.items():
-        if name.lower() == target_model_name.lower() \
-           and issubclass(cls, BaseModel):
+        if name.lower() == target_model_name.lower() and issubclass(cls, BaseModel):
             model = cls
 
     if model is None:
-        print("In %s.py, there should be a subclass of BaseModel with class name that matches %s in lowercase." % (model_filename, target_model_name))
+        print(
+            "In %s.py, there should be a subclass of BaseModel with class name that matches %s in lowercase."
+            % (model_filename, target_model_name)
+        )
         exit(0)
 
     return model
@@ -72,11 +71,11 @@ def create_model(opt):
     return multigpu_instance
 
 
-class MultiGPUModelWrapper():
+class MultiGPUModelWrapper:
     def __init__(self, opt, model: BaseModel):
         self.opt = opt
         if opt.num_gpus > 0:
-            model = model.to('cuda:0')
+            model = model.to("cuda:0")
         self.parallelized_model = torch.nn.parallel.DataParallel(model)
         self.parallelized_model(command="per_gpu_initialize")
         self.singlegpu_model = self.parallelized_model.module
@@ -89,11 +88,11 @@ class MultiGPUModelWrapper():
         self.singlegpu_model.save(total_steps_so_far)
 
     def __call__(self, *args, **kwargs):
-        """ Calls are forwarded to __call__ of BaseModel through DataParallel, and corresponding methods specified by |command| will be called. Please see BaseModel.forward() to see how it is done. """
+        """Calls are forwarded to __call__ of BaseModel through DataParallel, and corresponding methods specified by |command| will be called. Please see BaseModel.forward() to see how it is done."""
         return self.parallelized_model(*args, **kwargs)
 
 
-class StateVariableStorage():
+class StateVariableStorage:
     pass
 
 

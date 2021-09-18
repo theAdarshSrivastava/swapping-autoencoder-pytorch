@@ -10,15 +10,16 @@ from util import is_custom_kernel_supported as is_custom_kernel_supported
 if is_custom_kernel_supported():
     module_path = os.path.dirname(__file__)
     fused = load(
-        'fused',
-        sources=[ 
-            os.path.join(module_path, 'fused_bias_act.cpp'),
-            os.path.join(module_path, 'fused_bias_act_kernel.cu'),
+        "fused",
+        sources=[
+            os.path.join(module_path, "fused_bias_act.cpp"),
+            os.path.join(module_path, "fused_bias_act_kernel.cu"),
         ],
-        verbose=True,
+        verbose=False,
     )
 
 use_custom_kernel = is_custom_kernel_supported()
+
 
 class FusedLeakyReLUFunctionBackward(Function):
     @staticmethod
@@ -29,9 +30,7 @@ class FusedLeakyReLUFunctionBackward(Function):
 
         empty = grad_output.new_empty(0)
 
-        grad_input = fused.fused_bias_act(
-            grad_output, empty, out, 3, 1, negative_slope, scale
-        )
+        grad_input = fused.fused_bias_act(grad_output, empty, out, 3, 1, negative_slope, scale)
 
         dim = [0]
 
@@ -44,10 +43,8 @@ class FusedLeakyReLUFunctionBackward(Function):
 
     @staticmethod
     def backward(ctx, gradgrad_input, gradgrad_bias):
-        out, = ctx.saved_tensors
-        gradgrad_out = fused.fused_bias_act(
-            gradgrad_input, gradgrad_bias, out, 3, 1, ctx.negative_slope, ctx.scale
-        )
+        (out,) = ctx.saved_tensors
+        gradgrad_out = fused.fused_bias_act(gradgrad_input, gradgrad_bias, out, 3, 1, ctx.negative_slope, ctx.scale)
 
         return gradgrad_out, None, None, None
 
@@ -65,11 +62,9 @@ class FusedLeakyReLUFunction(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        out, = ctx.saved_tensors
+        (out,) = ctx.saved_tensors
 
-        grad_input, grad_bias = FusedLeakyReLUFunctionBackward.apply(
-            grad_output, out, ctx.negative_slope, ctx.scale
-        )
+        grad_input, grad_bias = FusedLeakyReLUFunctionBackward.apply(grad_output, out, ctx.negative_slope, ctx.scale)
 
         return grad_input, grad_bias, None, None
 
