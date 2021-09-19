@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import numpy as np
 import math
 import torch
@@ -18,7 +19,7 @@ class ToSpatialCode(torch.nn.Module):
         self.scale = scale
         self.upsample = Upsample([1, 3, 3, 1], 2)
         self.blur = Blur([1, 3, 3, 1], pad=(2, 1))
-        self.register_buffer('kernel', make_kernel([1, 3, 3, 1]))
+        self.register_buffer("kernel", make_kernel([1, 3, 3, 1]))
 
     def forward(self, x):
         x = self.conv1(x)
@@ -26,6 +27,14 @@ class ToSpatialCode(torch.nn.Module):
         for i in range(int(np.log2(self.scale))):
             x = self.upsample(x)
         return x
+
+
+@dataclass
+class EncoderConfig:
+    netE_scale_capacity: float = 1.0
+    netE_num_downsampling_sp: int = 4
+    netE_num_downsampling_gl: int = 2
+    netE_nc_steepness: float = 2.0
 
 
 class StyleGAN2ResnetEncoder(BaseNetwork):
@@ -48,9 +57,7 @@ class StyleGAN2ResnetEncoder(BaseNetwork):
         self.DownToSpatialCode = nn.Sequential()
         for i in range(self.opt.netE_num_downsampling_sp):
             self.DownToSpatialCode.add_module(
-                "ResBlockDownBy%d" % (2 ** i),
-                ResBlock(self.nc(i), self.nc(i + 1), blur_kernel,
-                         reflection_pad=True)
+                "ResBlockDownBy%d" % (2 ** i), ResBlock(self.nc(i), self.nc(i + 1), blur_kernel, reflection_pad=True)
             )
 
         # Spatial Code refers to the Structure Code, and
@@ -60,9 +67,8 @@ class StyleGAN2ResnetEncoder(BaseNetwork):
             "ToSpatialCode",
             nn.Sequential(
                 ConvLayer(nchannels, nchannels, 1, activate=True, bias=True),
-                ConvLayer(nchannels, self.opt.spatial_code_ch, kernel_size=1,
-                          activate=False, bias=True)
-            )
+                ConvLayer(nchannels, self.opt.spatial_code_ch, kernel_size=1, activate=False, bias=True),
+            ),
         )
 
         self.DownToGlobalCode = nn.Sequential()
@@ -70,19 +76,18 @@ class StyleGAN2ResnetEncoder(BaseNetwork):
             idx_from_beginning = self.opt.netE_num_downsampling_sp + i
             self.DownToGlobalCode.add_module(
                 "ConvLayerDownBy%d" % (2 ** idx_from_beginning),
-                ConvLayer(self.nc(idx_from_beginning),
-                          self.nc(idx_from_beginning + 1), kernel_size=3,
-                          blur_kernel=[1], downsample=True, pad=0)
+                ConvLayer(
+                    self.nc(idx_from_beginning),
+                    self.nc(idx_from_beginning + 1),
+                    kernel_size=3,
+                    blur_kernel=[1],
+                    downsample=True,
+                    pad=0,
+                ),
             )
 
-        nchannels = self.nc(self.opt.netE_num_downsampling_sp +
-                            self.opt.netE_num_downsampling_gl)
-        self.add_module(
-            "ToGlobalCode",
-            nn.Sequential(
-                EqualLinear(nchannels, self.opt.global_code_ch)
-            )
-        )
+        nchannels = self.nc(self.opt.netE_num_downsampling_sp + self.opt.netE_num_downsampling_gl)
+        self.add_module("ToGlobalCode", nn.Sequential(EqualLinear(nchannels, self.opt.global_code_ch)))
 
     def nc(self, idx):
         nc = self.opt.netE_nc_steepness ** (5 + idx)
@@ -96,12 +101,10 @@ class StyleGAN2ResnetEncoder(BaseNetwork):
         sp = self.ToSpatialCode(midpoint)
 
         if extract_features:
-            padded_midpoint = F.pad(midpoint, (1, 0, 1, 0), mode='reflect')
+            padded_midpoint = F.pad(midpoint, (1, 0, 1, 0), mode="reflect")
             feature = self.DownToGlobalCode[0](padded_midpoint)
-            assert feature.size(2) == sp.size(2) // 2 and \
-                feature.size(3) == sp.size(3) // 2
-            feature = F.interpolate(
-                feature, size=(7, 7), mode='bilinear', align_corners=False)
+            assert feature.size(2) == sp.size(2) // 2 and feature.size(3) == sp.size(3) // 2
+            feature = F.interpolate(feature, size=(7, 7), mode="bilinear", align_corners=False)
 
         x = self.DownToGlobalCode(midpoint)
         x = x.mean(dim=(2, 3))

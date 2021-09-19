@@ -8,6 +8,14 @@ from models.networks import BaseNetwork
 from models.networks.stylegan2_layers import ConvLayer, ResBlock, EqualLinear
 
 
+class PatchDiscConfig:
+    netPatchD_scale_capacity: float = 4.0
+    netPatchD_max_nc: int = 256 + 128
+    patch_size: int = 128
+    max_num_tiles: int = 8
+    patch_random_transformation: bool = False
+
+
 class BasePatchDiscriminator(BaseNetwork):
     @staticmethod
     def modify_commandline_options(parser, is_train):
@@ -15,13 +23,12 @@ class BasePatchDiscriminator(BaseNetwork):
         parser.add_argument("--netPatchD_max_nc", default=256 + 128, type=int)
         parser.add_argument("--patch_size", default=128, type=int)
         parser.add_argument("--max_num_tiles", default=8, type=int)
-        parser.add_argument("--patch_random_transformation",
-                            type=util.str2bool, nargs='?', const=True, default=False)
+        parser.add_argument("--patch_random_transformation", type=util.str2bool, nargs="?", const=True, default=False)
         return parser
 
     def __init__(self, opt):
         super().__init__(opt)
-        #self.visdom = util.Visualizer(opt)
+        # self.visdom = util.Visualizer(opt)
 
     def needs_regularization(self):
         return False
@@ -38,7 +45,7 @@ class BasePatchDiscriminator(BaseNetwork):
         before = patches
         transformer = util.RandomSpatialTransformer(self.opt, B * ntiles)
         patches = transformer.forward_transform(patches, (self.opt.patch_size, self.opt.patch_size))
-        #self.visdom.display_current_results({'before': before,
+        # self.visdom.display_current_results({'before': before,
         #                                     'after': patches}, 0, save_result=False)
         return patches.view(B, ntiles, C, H, W)
 
@@ -48,14 +55,12 @@ class BasePatchDiscriminator(BaseNetwork):
         if H % s > 0 or W % s > 0:
             y_offset = torch.randint(H % s, (), device=img.device)
             x_offset = torch.randint(W % s, (), device=img.device)
-            img = img[:, :,
-                      y_offset:y_offset + s * (H // s),
-                      x_offset:x_offset + s * (W // s)]
-        img = img.view(B, C, H//s, s, W//s, s)
+            img = img[:, :, y_offset : y_offset + s * (H // s), x_offset : x_offset + s * (W // s)]
+        img = img.view(B, C, H // s, s, W // s, s)
         ntiles = (H // s) * (W // s)
         tiles = img.permute(0, 2, 4, 1, 3, 5).reshape(B, ntiles, C, s, s)
         if indices is None:
-            indices = torch.randperm(ntiles, device=img.device)[:self.opt.max_num_tiles]
+            indices = torch.randperm(ntiles, device=img.device)[: self.opt.max_num_tiles]
             return self.apply_random_transformation(tiles[:, indices]), indices
         else:
             return self.apply_random_transformation(tiles[:, indices])
@@ -69,20 +74,15 @@ class BasePatchDiscriminator(BaseNetwork):
 
         bs = real.size(0)
         if fake is None or not fake_only:
-            pred_real = self.discriminate_features(
-                real_feat,
-                torch.roll(real_feat, 1, 1))
+            pred_real = self.discriminate_features(real_feat, torch.roll(real_feat, 1, 1))
             pred_real = pred_real.view(bs, -1)
-
 
         if fake is not None:
             fake_patches = self.sample_patches(fake, patch_ids)
-            #self.visualizer.display_current_results({'real_A': real_patches[0],
+            # self.visualizer.display_current_results({'real_A': real_patches[0],
             #                                         'real_B': torch.roll(fake_patches, 1, 1)[0]}, 0, False, max_num_images=16)
             fake_feat = self.extract_features(fake_patches)
-            pred_fake = self.discriminate_features(
-                real_feat,
-                torch.roll(fake_feat, 1, 1))
+            pred_fake = self.discriminate_features(real_feat, torch.roll(fake_feat, 1, 1))
             pred_fake = pred_fake.view(bs, -1)
 
         if fake is None:
@@ -91,7 +91,6 @@ class BasePatchDiscriminator(BaseNetwork):
             return pred_fake
         else:
             return pred_real, pred_fake
-  
 
 
 class StyleGAN2PatchDiscriminator(BasePatchDiscriminator):
@@ -120,7 +119,7 @@ class StyleGAN2PatchDiscriminator(BasePatchDiscriminator):
 
         blur_kernel = [1, 3, 3, 1] if self.opt.use_antialias else [1]
 
-        convs = [('0', ConvLayer(3, in_channel, 3))]
+        convs = [("0", ConvLayer(3, in_channel, 3))]
 
         for i in range(log_size, 2, -1):
             out_channel = channels[2 ** (i - 1)]
@@ -130,16 +129,16 @@ class StyleGAN2PatchDiscriminator(BasePatchDiscriminator):
 
             in_channel = out_channel
 
-        convs.append(('5', ResBlock(in_channel, self.opt.netPatchD_max_nc * 2, downsample=False)))
-        convs.append(('6', ConvLayer(self.opt.netPatchD_max_nc * 2, self.opt.netPatchD_max_nc, 3, pad=0)))
+        convs.append(("5", ResBlock(in_channel, self.opt.netPatchD_max_nc * 2, downsample=False)))
+        convs.append(("6", ConvLayer(self.opt.netPatchD_max_nc * 2, self.opt.netPatchD_max_nc, 3, pad=0)))
 
         self.convs = nn.Sequential(OrderedDict(convs))
 
         out_dim = 1
 
-        pairlinear1 = EqualLinear(channels[4] * 2 * 2 * 2, 2048, activation='fused_lrelu')
-        pairlinear2 = EqualLinear(2048, 2048, activation='fused_lrelu')
-        pairlinear3 = EqualLinear(2048, 1024, activation='fused_lrelu')
+        pairlinear1 = EqualLinear(channels[4] * 2 * 2 * 2, 2048, activation="fused_lrelu")
+        pairlinear2 = EqualLinear(2048, 2048, activation="fused_lrelu")
+        pairlinear3 = EqualLinear(2048, 1024, activation="fused_lrelu")
         pairlinear4 = EqualLinear(1024, out_dim)
         self.pairlinear = nn.Sequential(pairlinear1, pairlinear2, pairlinear3, pairlinear4)
 
