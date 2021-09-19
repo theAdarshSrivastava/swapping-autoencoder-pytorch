@@ -70,67 +70,74 @@ def get_params(opt, size):
     w, h = size
     new_h = h
     new_w = w
-    if opt.preprocess == 'resize_and_crop':
+    if opt.preprocess == "resize_and_crop":
         new_h = new_w = opt.load_size
-    elif opt.preprocess == 'scale_width_and_crop':
+    elif opt.preprocess == "scale_width_and_crop":
         new_w = opt.load_size
         new_h = opt.load_size * h // w
 
     x = random.randint(0, np.maximum(0, new_w - opt.crop_size))
     y = random.randint(0, np.maximum(0, new_h - opt.crop_size))
 
-    return {'crop_pos': (x, y)}
+    return {"crop_pos": (x, y)}
 
 
-def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True):
+def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True, load_size: int = None):
+    _load_size = opt.load_size
+    if load_size != None:
+        _load_size = load_size
+
     transform_list = []
     if grayscale:
         transform_list.append(transforms.Grayscale(1))
-    if 'fixsize' in opt.preprocess:
-        transform_list.append(transforms.Resize((opt.crop_size, opt.load_size), method))
-    if 'resize' in opt.preprocess:
-        osize = [opt.load_size, opt.load_size]
+    if "fixsize" in opt.preprocess:
+        transform_list.append(transforms.Resize((opt.crop_size, _load_size), method))
+    if "resize" in opt.preprocess:
+        osize = [_load_size, _load_size]
         if "gta2cityscapes" in opt.dataroot:
-            osize[0] = opt.load_size // 2
+            osize[0] = _load_size // 2
         transform_list.append(transforms.Resize(osize, method))
-    elif 'scale_width' in opt.preprocess:
-        transform_list.append(transforms.Lambda(lambda img: __scale_width(img, opt.load_size, opt.crop_size, method)))
-    elif 'scale_shortside' in opt.preprocess:
-        transform_list.append(transforms.Lambda(lambda img: __scale_shortside(img, opt.load_size, opt.crop_size, method)))
-    elif 'scale_longside' in opt.preprocess:
-        transform_list.append(transforms.Lambda(lambda img: __scale_longside(img, opt.load_size, opt.crop_size, method)))
-        
+    elif "scale_width" in opt.preprocess:
+        transform_list.append(transforms.Lambda(lambda img: __scale_width(img, _load_size, opt.crop_size, method)))
+    elif "scale_shortside" in opt.preprocess:
+        transform_list.append(transforms.Lambda(lambda img: __scale_shortside(img, _load_size, opt.crop_size, method)))
+    elif "scale_longside" in opt.preprocess:
+        transform_list.append(transforms.Lambda(lambda img: __scale_longside(img, _load_size, opt.crop_size, method)))
 
-    #if 'rotate' in opt.preprocess:
+    # if 'rotate' in opt.preprocess:
     #    transform_list.append(transforms.RandomRotation(180, resample=Image.BILINEAR))
 
-    if 'zoom' in opt.preprocess:
+    if "zoom" in opt.preprocess:
         if params is None:
-            transform_list.append(transforms.Lambda(lambda img: __random_zoom(img, opt.load_size, opt.crop_size, method)))
+            transform_list.append(transforms.Lambda(lambda img: __random_zoom(img, _load_size, opt.crop_size, method)))
         else:
-            transform_list.append(transforms.Lambda(lambda img: __random_zoom(img, opt.load_size, opt.crop_size, method, factor=params["scale_factor"])))
+            transform_list.append(
+                transforms.Lambda(
+                    lambda img: __random_zoom(img, _load_size, opt.crop_size, method, factor=params["scale_factor"])
+                )
+            )
 
-    if 'centercrop'in opt.preprocess:
+    if "centercrop" in opt.preprocess:
         transform_list.append(transforms.Lambda(lambda img: __centercrop(img)))
-    elif 'crop' in opt.preprocess:
-        if params is None or 'crop_pos' not in params:
+    elif "crop" in opt.preprocess:
+        if params is None or "crop_pos" not in params:
             transform_list.append(transforms.RandomCrop(opt.crop_size, padding=opt.preprocess_crop_padding))
         else:
-            transform_list.append(transforms.Lambda(lambda img: __crop(img, params['crop_pos'], opt.crop_size)))
+            transform_list.append(transforms.Lambda(lambda img: __crop(img, params["crop_pos"], opt.crop_size)))
 
-    if 'patch' in opt.preprocess:
-        transform_list.append(transforms.Lambda(lambda img: __patch(img, params['patch_index'], opt.crop_size)))
+    if "patch" in opt.preprocess:
+        transform_list.append(transforms.Lambda(lambda img: __patch(img, params["patch_index"], opt.crop_size)))
 
-    if 'trim' in opt.preprocess:
+    if "trim" in opt.preprocess:
         transform_list.append(transforms.Lambda(lambda img: __trim(img, opt.crop_size)))
 
-    #if opt.preprocess == 'none':
+    # if opt.preprocess == 'none':
     transform_list.append(transforms.Lambda(lambda img: __make_power_2(img, base=16, method=method)))
 
     random_flip = opt.isTrain and (not opt.no_flip)
     if random_flip:
         transform_list.append(transforms.RandomHorizontalFlip())
-    #elif 'flip' in params:
+    # elif 'flip' in params:
     #    transform_list.append(transforms.Lambda(lambda img: __flip(img, params['flip'])))
 
     if convert:
@@ -149,7 +156,7 @@ def __make_power_2(img, base, method=Image.BICUBIC):
     if h == oh and w == ow:
         return img
 
-    #__print_size_warning(ow, oh, w, h)
+    # __print_size_warning(ow, oh, w, h)
     return img.resize((w, h), method)
 
 
@@ -171,16 +178,19 @@ def __scale_shortside(img, target_width, crop_width, method=Image.BICUBIC):
     scale = target_width / shortside
     return img.resize((round(ow * scale), round(oh * scale)), method)
 
+
 def __centercrop(img):
     ow, oh = img.size
     s = min(ow, oh)
     return img.crop(((ow - s) // 2, (oh - s) // 2, (ow + s) // 2, (oh + s) // 2))
+
 
 def __scale_longside(img, target_width, crop_width, method=Image.BICUBIC):
     ow, oh = img.size
     longside = max(ow, oh)
     scale = target_width / longside
     return img.resize((round(ow * scale), round(oh * scale)), method)
+
 
 def __trim(img, trim_width):
     ow, oh = img.size
@@ -204,7 +214,7 @@ def __scale_width(img, target_width, crop_width, method=Image.BICUBIC):
     if ow == target_width and oh >= crop_width:
         return img
     w = target_width
-    #h = int(max(target_width * oh / ow, crop_width))
+    # h = int(max(target_width * oh / ow, crop_width))
     h = int(target_width * oh / ow)
     return img.resize((w, h), method)
 
@@ -213,7 +223,7 @@ def __crop(img, pos, size):
     ow, oh = img.size
     x1, y1 = pos
     tw = th = size
-    if (ow > tw or oh > th):
+    if ow > tw or oh > th:
         return img.crop((x1, y1, x1 + tw, y1 + th))
     return img
 
@@ -242,9 +252,11 @@ def __flip(img, flip):
 
 def __print_size_warning(ow, oh, w, h):
     """Print warning information about image size(only print once)"""
-    if not hasattr(__print_size_warning, 'has_printed'):
-        print("The image size needs to be a multiple of 4. "
-              "The loaded image size was (%d, %d), so it was adjusted to "
-              "(%d, %d). This adjustment will be done to all images "
-              "whose sizes are not multiples of 4" % (ow, oh, w, h))
+    if not hasattr(__print_size_warning, "has_printed"):
+        print(
+            "The image size needs to be a multiple of 4. "
+            "The loaded image size was (%d, %d), so it was adjusted to "
+            "(%d, %d). This adjustment will be done to all images "
+            "whose sizes are not multiples of 4" % (ow, oh, w, h)
+        )
         __print_size_warning.has_printed = True
