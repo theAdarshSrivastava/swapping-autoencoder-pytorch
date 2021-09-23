@@ -1,7 +1,13 @@
+import os
 from functools import wraps
 from time import time
+from typing import List
+import random
+
 import torch
 from torchvision import transforms
+
+from api.const import KNOWN_IMAGE_FORMATS
 
 tabs = -1
 ON = True
@@ -31,3 +37,17 @@ def timing(f):
 
 def tensor_to_PIL(im: torch.Tensor):
     return transforms.ToPILImage()((im.clamp(-1.0, 1.0) + 1.0) * 0.5)
+
+
+def find_images(folder: str = None) -> List:
+    it = os.walk(folder or "./testphotos/mountain/fig12")
+    result = []
+    for path, _, imgs in it:
+        if len(imgs) > 0:
+            img_folder = [path + "/" + img for img in imgs if img.split(".")[-1] in KNOWN_IMAGE_FORMATS]
+        result.extend(img_folder)
+    return result
+
+
+def key_gen():
+    return "".join([random.choice("abhishek") for i in range(5)])

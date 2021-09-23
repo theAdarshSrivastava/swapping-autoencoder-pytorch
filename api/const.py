@@ -22,3 +22,6 @@ class Global_config(SwappingAEConfig, DatasetConfig):
     use_antialias: bool = True
     crop_size: int = 128
     load_size: int = 128
+
+
+KNOWN_IMAGE_FORMATS = ["jpeg", "jpg"]
