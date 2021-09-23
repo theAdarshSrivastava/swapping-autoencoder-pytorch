@@ -16,6 +16,7 @@ class SwAeController:
     transform: Union[torchvision.transforms.Compose, None] = None
     global_sty: Union[torch.Tensor, None] = None
     global_tex: Union[torch.Tensor, None] = None
+    tex_path: str = None
     cache: Dict = {}
     sty_argumentation: OrderedDict = OrderedDict()
 
@@ -51,6 +52,10 @@ class SwAeController:
 
     @timing
     def set_tex(self, tex_path):
+        if tex_path == None and self.tex_path == tex_path:
+            return
+        if self.tex_path == None:
+            self.tex_path = tex_path
         source = self.load_image(tex_path).to("cuda")
         with torch.no_grad():
             self.model(sample_image=source, command="fix_noise")
@@ -74,6 +79,11 @@ class SwAeController:
 
     @timing
     def mix_style(self, style_path, alpha):
+        if alpha == 0:
+            if style_path in self.sty_argumentation:
+                del self.sty_argumentation[style_path]
+            return
+
         if style_path not in self.cache:
             tex, sty = self.load_encode_cache(style_path)
         # assume alpha has changed if same path is sent
@@ -82,14 +92,14 @@ class SwAeController:
     @timing
     def compute(self):
         assert self.global_sty != None and self.global_tex != None
-        local_sty = self.global_sty.clone().to("cuda")
+        torch.cuda.empty_cache()
+        local_sty = self.global_sty.clone()
         for path, alpha in self.sty_argumentation.items():
-            cached_sty = self.cache[path][1].clone().to("cuda")
+            cached_sty = self.cache[path][1].clone()
             local_sty = self.lerp(local_sty, cached_sty, alpha)
-            cached_sty = cached_sty.to("cpu")
         with torch.no_grad():
-            out = self.model(self.global_tex.to("cuda"), local_sty, command="decode")
-        local_sty.to("cpu")
+            out = self.model(self.global_tex.to("cuda"), local_sty.to("cuda"), command="decode")
+        local_sty = local_sty.to("cpu")
         return out
 
     @staticmethod
