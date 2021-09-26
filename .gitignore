@@ -1,5 +1,5 @@
 # result files
-*.png
+results/
 *.txt
 
 # ipython notebook files should be manually added after clearning output and kernel
