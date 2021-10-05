@@ -72,7 +72,7 @@ Please read [`Contributing.md`](https://github.com/SRM-IST-KTR/template/blob/mai
 
 ## ⚙️ Maintainers
 
-| <p align="center">![Abhishek Saxena](https://github.com/saxenabhishek.png?size=128)<br>[Abhishek Saxena](https://github.com/saxenabhishek)</p><p align="center">![Adarsh Srivastava](https://github.com/theAdarshSrivastava.png?size=128)<br>[Adarsh Srivastava](https://github.com/theAdarshSrivastava)</p> |
+| ![Abhishek Saxena](https://github.com/saxenabhishek.png?size=128)<br>[Abhishek Saxena](https://github.com/saxenabhishek)![Adarsh Srivastava](https://github.com/theAdarshSrivastava.png?size=128)<br>[Adarsh Srivastava](https://github.com/theAdarshSrivastava)|
 | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 
 ## 💥 Contributors
